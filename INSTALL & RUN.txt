@@ -1,0 +1,20 @@
+THINGS YOU NEED TO INSTALL
+pip install -r requirements.txt
+
+CREATE A .env file and paste this there 
+
+OPENAI_API_KEY=your_openai_api_key_here
+WHATSAPP_TOKEN=your_whatsapp_token_here
+PHONE_NUMBER_ID=your_phone_number_id_here
+VERIFY_TOKEN=your_verify_token_here
+WHATSAPP_API_VERSION=v21.0
+
+
+ THEN, OPEN TERMINAL 1 and run
+1. python app.py
+
+OPEN ANOTHER TERMINAL 2 and run
+ 2. pip install pyngrok
+ 3. python run_tunnel.py
+ 4. ngrok http 5000
+

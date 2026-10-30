@@ -1,0 +1,21 @@
+# Azure DevOps Pipeline for Access Bank Ghana Chatbot
+trigger:
+  - main
+  - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  imageName: 'abg-chatbot'
+
+steps:
+- task: Docker@2
+  displayName: 'Build Docker image'
+  inputs:
+    command: 'build'
+    dockerfile: '**/Dockerfile'
+    repository: $(imageName)
+    tags: |
+      $(Build.BuildId)
+      latest

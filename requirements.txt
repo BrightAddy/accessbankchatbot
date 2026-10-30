@@ -1,0 +1,15 @@
+flask
+requests
+python-dotenv
+langchain
+langchain-community
+langchain-openai
+langchain-huggingface
+langchain-text-splitters
+sentence-transformers
+beautifulsoup4
+bs4
+gunicorn
+pypdf
+pyodbc
+pymssql
