@@ -24,6 +24,15 @@ WHATSAPP_API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v21.0")
 WHATSAPP_REQUEST_TIMEOUT = int(os.getenv("WHATSAPP_REQUEST_TIMEOUT", "20"))
 
 
+# ── Health Check ────────────────────────────────────────────────────────────
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "online",
+        "service": "Access Bank Ghana WhatsApp Bot"
+    }), 200
+
+
 # ── Webhook Verification ────────────────────────────────────────────────────
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
