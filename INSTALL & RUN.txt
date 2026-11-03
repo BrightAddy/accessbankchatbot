@@ -1,20 +1,50 @@
-THINGS YOU NEED TO INSTALL
-pip install -r requirements.txt
+================================================================================
+ACCESS BANK GHANA WHATSAPP BOT - QUICK START GUIDE
+================================================================================
 
-CREATE A .env file and paste this there 
+--------------------------------------------------------------------------------
+OPTION 1: DOCKER (RECOMMENDED - RUN WITH 1 FILE OR 1 LINE)
+--------------------------------------------------------------------------------
+Prerequisite:
+  Install Docker Desktop on Windows:
+  https://www.docker.com/products/docker-desktop/
+  (Make sure Docker Desktop is running before starting)
 
-OPENAI_API_KEY=your_openai_api_key_here
-WHATSAPP_TOKEN=your_whatsapp_token_here
-PHONE_NUMBER_ID=your_phone_number_id_here
-VERIFY_TOKEN=your_verify_token_here
-WHATSAPP_API_VERSION=v21.0
+Setup:
+  1. Ensure you have your `.env` file created with your credentials:
+     OPENAI_API_KEY=your_openai_api_key_here
+     WHATSAPP_TOKEN=your_whatsapp_token_here
+     PHONE_NUMBER_ID=your_phone_number_id_here
+     VERIFY_TOKEN=your_verify_token_here
+     WHATSAPP_API_VERSION=v21.0
+
+How to Run:
+  * SINGLE FILE:
+    Double-click `docker-start.bat` in Windows Explorer.
+    (To stop, double-click `docker-stop.bat` or press Ctrl+C)
+
+  * SINGLE LINE OF CODE (Command line):
+    docker compose up --build
+
+  To run in detached/background mode:
+    docker compose up -d --build
+
+  To view logs while in background:
+    docker compose logs -f
+
+  To stop container:
+    docker compose down
 
 
- THEN, OPEN TERMINAL 1 and run
-1. python app.py
+--------------------------------------------------------------------------------
+OPTION 2: LOCAL PYTHON (WITHOUT DOCKER)
+--------------------------------------------------------------------------------
+1. Install dependencies:
+   pip install -r requirements.txt
 
-OPEN ANOTHER TERMINAL 2 and run
- 2. pip install pyngrok
- 3. python run_tunnel.py
- 4. ngrok http 5000
+2. Run the bot:
+   Double-click `start.bat` OR run:
+   python app.py
 
+3. Expose port for Meta Webhook (in another terminal):
+   ngrok http 5000
