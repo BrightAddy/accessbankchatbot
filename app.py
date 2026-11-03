@@ -64,7 +64,15 @@ def process_message_async(sender_number, message_text, message_id=None, phone_nu
 
         send_whatsapp_message(sender_number, answer, phone_number_id=phone_number_id)
     except Exception as e:
-        print(f"❌ Error processing message: {e}")
+        print(f"❌ Error processing message for {sender_number}: {e}")
+        try:
+            send_whatsapp_message(
+                sender_number,
+                "I apologize, but I am experiencing a temporary system delay. Please try again shortly or contact Access Bank Ghana Customer Care at 0800 004 400.",
+                phone_number_id=phone_number_id
+            )
+        except Exception as send_err:
+            print(f"❌ Failed to send fallback message: {send_err}")
 
 
 # ── Receive Messages ────────────────────────────────────────────────────────
@@ -89,6 +97,23 @@ def receive_message():
         message = value["messages"][0]
         message_id = message.get("id")
         phone_number_id = value.get("metadata", {}).get("phone_number_id")
+        
+        contacts = value.get("contacts")
+        first_contact = contacts[0] if (contacts and isinstance(contacts, list) and len(contacts) > 0 and isinstance(contacts[0], dict)) else {}
+
+        # Support standard phone numbers as well as Meta Cloud API user_ids / usernames
+        sender_number = (
+            message.get("from")
+            or message.get("from_user_id")
+            or first_contact.get("wa_id")
+            or first_contact.get("user_id")
+        )
+        
+        contact_name = None
+        if isinstance(first_contact.get("profile"), dict):
+            contact_name = first_contact["profile"].get("name")
+
+        msg_type = message.get("type", "unknown")
 
         # Prevent duplicate handling if Meta retries
         if message_id:
@@ -98,14 +123,29 @@ def receive_message():
             if len(PROCESSED_MESSAGE_IDS) > 2000:
                 PROCESSED_MESSAGE_IDS.clear()
 
-        if message.get("type") != "text":
-            return jsonify({"status": "ignored_non_text"}), 200
+        # Handle non-text messages (voice notes, images, stickers, documents)
+        if msg_type != "text":
+            print(f"ℹ️ Received non-text ({msg_type}) message from {sender_number} ({contact_name or 'User'})")
+            threading.Thread(
+                target=send_whatsapp_message,
+                args=(sender_number, "Hello! Currently, I can only assist with written text messages. Please type your banking question and I'll be happy to help!", phone_number_id),
+                daemon=True
+            ).start()
+            return jsonify({"status": "handled_non_text"}), 200
 
-        sender_number = message.get("from")
-        message_text = message.get("text", {}).get("body", "")
+        raw_text = message.get("text")
+        if isinstance(raw_text, dict):
+            message_text = raw_text.get("body", "")
+        elif isinstance(raw_text, str):
+            message_text = raw_text
+        else:
+            message_text = ""
 
         if not sender_number or not message_text:
+            print(f"⚠️ Webhook message ignored: sender='{sender_number}', text='{message_text}'")
             return jsonify({"status": "ignored"}), 200
+
+        print(f"📩 Webhook message from {sender_number} ({contact_name or 'User'}): '{message_text}'")
 
         # Run in background thread so Meta gets instant 200 OK without timeout
         threading.Thread(
@@ -115,6 +155,8 @@ def receive_message():
         ).start()
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"❌ Webhook Error: {e}")
 
     return jsonify({"status": "ok"}), 200
@@ -130,7 +172,8 @@ def send_whatsapp_message(to_number, message, phone_number_id=None):
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": to_number,
+        "recipient_type": "individual",
+        "to": str(to_number),
         "type": "text",
         "text": {"body": message}
     }
