@@ -62,14 +62,15 @@ def process_message_async(sender_number, message_text, message_id=None, phone_nu
         duration = round(time.time() - t0, 2)
         print(f"🤖 [{sender_number}] Generated reply in {duration}s: {answer[:80]}...")
 
-        send_whatsapp_message(sender_number, answer, phone_number_id=phone_number_id)
+        send_whatsapp_message(sender_number, answer, phone_number_id=phone_number_id, message_id=message_id)
     except Exception as e:
         print(f"❌ Error processing message for {sender_number}: {e}")
         try:
             send_whatsapp_message(
                 sender_number,
                 "I apologize, but I am experiencing a temporary system delay. Please try again shortly or contact Access Bank Ghana Customer Care at 0800 004 400.",
-                phone_number_id=phone_number_id
+                phone_number_id=phone_number_id,
+                message_id=message_id
             )
         except Exception as send_err:
             print(f"❌ Failed to send fallback message: {send_err}")
@@ -128,7 +129,7 @@ def receive_message():
             print(f"ℹ️ Received non-text ({msg_type}) message from {sender_number} ({contact_name or 'User'})")
             threading.Thread(
                 target=send_whatsapp_message,
-                args=(sender_number, "Hello! Currently, I can only assist with written text messages. Please type your banking question and I'll be happy to help!", phone_number_id),
+                args=(sender_number, "Hello! Currently, I can only assist with written text messages. Please type your banking question and I'll be happy to help!", phone_number_id, message_id),
                 daemon=True
             ).start()
             return jsonify({"status": "handled_non_text"}), 200
@@ -163,7 +164,7 @@ def receive_message():
 
 
 
-def send_whatsapp_message(to_number, message, phone_number_id=None):
+def send_whatsapp_message(to_number, message, phone_number_id=None, message_id=None):
     pn_id = phone_number_id if (phone_number_id and phone_number_id != "123456123") else PHONE_NUMBER_ID
     url = f"https://graph.facebook.com/{WHATSAPP_API_VERSION}/{pn_id}/messages"
     headers = {
@@ -177,6 +178,10 @@ def send_whatsapp_message(to_number, message, phone_number_id=None):
         "type": "text",
         "text": {"body": message}
     }
+    # Provide message_id context so replies to Meta User IDs / BSUIDs are accurately threaded and delivered
+    if message_id:
+        payload["context"] = {"message_id": message_id}
+
     response = requests.post(
         url,
         headers=headers,
