@@ -51,20 +51,21 @@ import time
 
 PROCESSED_MESSAGE_IDS = set()
 
-def process_message_async(sender_number, message_text, message_id=None, phone_number_id=None):
+def process_message_async(sender_number, message_text, message_id=None, phone_number_id=None, user_display=None):
+    label = user_display or sender_number
     try:
         t0 = time.time()
-        print(f"👤 [{sender_number}] Processing: '{message_text}'")
+        print(f"👤 [{label}] Processing: '{message_text}'")
         response = agent.invoke(
             {"messages": [{"role": "user", "content": message_text}]}
         )
         answer = response["messages"][-1].content
         duration = round(time.time() - t0, 2)
-        print(f"🤖 [{sender_number}] Generated reply in {duration}s: {answer[:80]}...")
+        print(f"🤖 [{label}] Generated reply in {duration}s: {answer[:80]}...")
 
         send_whatsapp_message(sender_number, answer, phone_number_id=phone_number_id, message_id=message_id)
     except Exception as e:
-        print(f"❌ Error processing message for {sender_number}: {e}")
+        print(f"❌ Error processing message for {label}: {e}")
         try:
             send_whatsapp_message(
                 sender_number,
@@ -110,9 +111,17 @@ def receive_message():
             or first_contact.get("user_id")
         )
         
-        contact_name = None
+        # Format display name from profile if available
+        user_display = sender_number
         if isinstance(first_contact.get("profile"), dict):
-            contact_name = first_contact["profile"].get("name")
+            p_name = first_contact["profile"].get("name")
+            p_user = first_contact["profile"].get("username")
+            if p_name and p_user:
+                user_display = f"{p_name} (@{p_user})"
+            elif p_name:
+                user_display = p_name
+            elif p_user:
+                user_display = f"@{p_user}"
 
         msg_type = message.get("type", "unknown")
 
@@ -126,7 +135,7 @@ def receive_message():
 
         # Handle non-text messages (voice notes, images, stickers, documents)
         if msg_type != "text":
-            print(f"ℹ️ Received non-text ({msg_type}) message from {sender_number} ({contact_name or 'User'})")
+            print(f"ℹ️ Received non-text ({msg_type}) message from {user_display}")
             threading.Thread(
                 target=send_whatsapp_message,
                 args=(sender_number, "Hello! Currently, I can only assist with written text messages. Please type your banking question and I'll be happy to help!", phone_number_id, message_id),
@@ -146,12 +155,12 @@ def receive_message():
             print(f"⚠️ Webhook message ignored: sender='{sender_number}', text='{message_text}'")
             return jsonify({"status": "ignored"}), 200
 
-        print(f"📩 Webhook message from {sender_number} ({contact_name or 'User'}): '{message_text}'")
+        print(f"📩 Webhook message from {user_display}: '{message_text}'")
 
         # Run in background thread so Meta gets instant 200 OK without timeout
         threading.Thread(
             target=process_message_async,
-            args=(sender_number, message_text, message_id, phone_number_id),
+            args=(sender_number, message_text, message_id, phone_number_id, user_display),
             daemon=True
         ).start()
 
