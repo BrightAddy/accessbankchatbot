@@ -1,50 +1,86 @@
 ================================================================================
-ACCESS BANK GHANA WHATSAPP BOT - QUICK START GUIDE
+ACCESS BANK GHANA WHATSAPP BOT - SETUP & RUN GUIDE
 ================================================================================
 
+This guide walks you through setting up, running, and accessing the bot on any
+machine after cloning from Azure Repos or GitHub.
+
 --------------------------------------------------------------------------------
-OPTION 1: DOCKER (RECOMMENDED - RUN WITH 1 FILE OR 1 LINE)
+PREREQUISITES
 --------------------------------------------------------------------------------
-Prerequisite:
-  Install Docker Desktop on Windows:
-  https://www.docker.com/products/docker-desktop/
-  (Make sure Docker Desktop is running before starting)
+1. Git: https://git-scm.com/
+2. Docker Desktop (Recommended): https://www.docker.com/products/docker-desktop/
+   - Ensure Docker Desktop is installed and running (showing green engine status).
+3. (Optional) Python 3.11+ (only needed if running without Docker).
 
-Setup:
-  1. Ensure you have your `.env` file created with your credentials:
-     OPENAI_API_KEY=your_openai_api_key_here
-     WHATSAPP_TOKEN=your_whatsapp_token_here
-     PHONE_NUMBER_ID=your_phone_number_id_here
-     VERIFY_TOKEN=your_verify_token_here
-     WHATSAPP_API_VERSION=v21.0
+--------------------------------------------------------------------------------
+STEP 1: CLONE THE REPOSITORY
+--------------------------------------------------------------------------------
+On the target machine, open your terminal (PowerShell or Command Prompt):
 
-How to Run:
-  * SINGLE FILE:
-    Double-click `docker-start.bat` in Windows Explorer.
-    (To stop, double-click `docker-stop.bat` or press Ctrl+C)
+  git clone <YOUR_AZURE_OR_GITHUB_REPO_URL>
+  cd accessbankchatbot
 
-  * SINGLE LINE OF CODE (Command line):
+--------------------------------------------------------------------------------
+STEP 2: CREATE YOUR .env CONFIGURATION FILE
+--------------------------------------------------------------------------------
+Create a new file named `.env` in the root folder of the project.
+Copy and paste this template and insert your actual credentials:
+
+  OPENAI_API_KEY=your_openai_api_key_here
+  WHATSAPP_TOKEN=your_meta_whatsapp_token_here
+  PHONE_NUMBER_ID=918110138054422
+  VERIFY_TOKEN=accessbank2024
+  WHATSAPP_API_VERSION=v21.0
+
+*(Note: The .env file is gitignored for security so secrets are never pushed).*
+
+--------------------------------------------------------------------------------
+STEP 3: RUN THE BOT
+--------------------------------------------------------------------------------
+
+METHOD A: DOCKER (RECOMMENDED)
+  * Option 1 (1-Click on Windows):
+    Double-click `docker-start.bat` in File Explorer.
+    (To stop cleanly, double-click `docker-stop.bat` or press Ctrl+C).
+
+  * Option 2 (Single Command):
     docker compose up --build
 
-  To run in detached/background mode:
+    To run silently in the background:
     docker compose up -d --build
 
-  To view logs while in background:
+    To check live logs:
     docker compose logs -f
 
-  To stop container:
+    To stop the bot container:
     docker compose down
 
+METHOD B: LOCAL PYTHON (WITHOUT DOCKER)
+  1. Install dependencies:
+     pip install -r requirements.txt
+
+  2. Run the application:
+     Double-click `start.bat` OR run:
+     python app.py
 
 --------------------------------------------------------------------------------
-OPTION 2: LOCAL PYTHON (WITHOUT DOCKER)
+STEP 4: ACCESS AND VERIFY THE BOT
 --------------------------------------------------------------------------------
-1. Install dependencies:
-   pip install -r requirements.txt
+1. Local Health Check (Browser):
+   Open your browser and visit:
+   http://localhost:5000/
+   Expected response:
+   {"service": "Access Bank Ghana WhatsApp Bot", "status": "online"}
 
-2. Run the bot:
-   Double-click `start.bat` OR run:
-   python app.py
+2. Live WhatsApp Webhook (From Mobile Phone):
+   - Double-click `start-ngrok.bat` (or run: ngrok http 5000 in terminal).
+   - Ensure the forwarding URL is registered in Meta Developer Portal:
+     https://developers.facebook.com/ -> WhatsApp -> Configuration -> Webhook
+     Callback URL: https://<your-ngrok-or-azure-domain>/webhook
+     Verify Token: accessbank2024
+     Webhook Subscription: Check 'messages'
 
-3. Expose port for Meta Webhook (in another terminal):
-   ngrok http 5000
+3. Send a WhatsApp message to the Access Bank Bot number (+233 59 755 5222).
+   The bot will reply immediately!
+================================================================================
