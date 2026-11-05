@@ -1,0 +1,2 @@
+# Overrides for the DEV environment
+replicaCount: 1

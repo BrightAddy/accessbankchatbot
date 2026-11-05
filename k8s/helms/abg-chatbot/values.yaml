@@ -1,0 +1,41 @@
+replicaCount: 1
+
+image:
+  repository: acbghregistry.azurecr.io/chatbots/abg-chatbot
+  tag: latest
+  pullPolicy: Always
+
+imageCredentials:
+  create: false
+  registry: acbghregistry.azurecr.io
+  username: ""
+  password: ""
+
+# Plain settings (safe to keep in git)
+appConfig:
+  whatsappApiVersion: v21.0
+  whatsappRequestTimeout: "20"
+
+# Secrets: supplied by the pipeline with --set, never stored in git
+appSecrets:
+  openaiApiKey: ""
+  whatsappToken: ""
+  phoneNumberId: ""
+  verifyToken: ""
+
+service:
+  port: 80
+  targetPort: 5000
+
+ingress:
+  enabled: false
+  className: ""
+  host: chatbot.example.com
+  tlsSecretName: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi

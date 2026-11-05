@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  # The vector index is built in memory at startup, so keep a single replica.
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      {{- if .Values.imageCredentials.create }}
+      imagePullSecrets:
+        - name: {{ .Release.Name }}-registry
+      {{- end }}
+      containers:
+        - name: bot
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+          env:
+            - name: PORT
+              value: "{{ .Values.service.targetPort }}"
+            - name: WHATSAPP_API_VERSION
+              value: {{ .Values.appConfig.whatsappApiVersion | quote }}
+            - name: WHATSAPP_REQUEST_TIMEOUT
+              value: {{ .Values.appConfig.whatsappRequestTimeout | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ .Release.Name }}-secrets
+          # Startup scrapes the website and builds embeddings, so allow time before probing.
+          startupProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.targetPort }}
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

@@ -1,21 +1,132 @@
-# Azure DevOps Pipeline for Access Bank Ghana Chatbot
 trigger:
-  - main
-  - master
+  branches:
+    include:
+      - main
 
-pool:
-  vmImage: 'ubuntu-latest'
+resources:
+  - repo: self
 
 variables:
-  imageName: 'abg-chatbot'
+  # Shared pipeline variables (same registry, pool and cluster access as the existing Rancher projects)
+  - name: majorMinorVersion
+    value: '1.0'
+  - name: agentPoolName
+    value: 'Linux SH Agent Pool'
+  - name: imageRepository
+    value: 'chatbots/abg-chatbot'          # TODO: confirm the repository path in ACR
+  - name: dockerfilePath
+    value: './Dockerfile'
+  - name: containerRegistry
+    value: 'acbghregistry.azurecr.io'
+  - name: dockerRegistryServiceConnection
+    value: 'acbghregistry-conn'
+  - name: valuesFile
+    value: 'values-dev.yaml'
+  - name: environmentName
+    value: 'DEV'
+  - name: k8sNamespace
+    value: 'abg-chatbot'                   # TODO: confirm the namespace with the Rancher team
+  - name: kubeConfigSecureFile
+    value: 'gh-digital-uat.yaml'           # TODO: confirm this is the right cluster
+  - name: releaseName
+    value: 'abg-chatbot'
+  - name: chartPath
+    value: 'k8s/helms/abg-chatbot'
 
-steps:
-- task: Docker@2
-  displayName: 'Build Docker image'
-  inputs:
-    command: 'build'
-    dockerfile: '**/Dockerfile'
-    repository: $(imageName)
-    tags: |
-      $(Build.BuildId)
-      latest
+stages:
+  - stage: Build
+    displayName: 'Build and Push Stage'
+    jobs:
+      - job: Build
+        displayName: 'Build $(environmentName)'
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - script: |
+              SHORT_SHA=$(git rev-parse --short HEAD)
+              VERSION="$(majorMinorVersion).$(Build.BuildId)"
+
+              echo "##vso[task.setvariable variable=semVer]$VERSION"
+              echo "##vso[task.setvariable variable=traceTag]$VERSION-$SHORT_SHA"
+              echo "Generating Tags: $VERSION and $VERSION-$SHORT_SHA"
+            displayName: 'Generate Semantic Version Tags'
+
+          - task: Docker@2
+            displayName: 'Build & Push Docker Image'
+            env:
+              DOCKER_BUILDKIT: 1
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              buildContext: '.'
+              containerRegistry: $(dockerRegistryServiceConnection)
+              tags: |
+                $(semVer)
+                $(traceTag)
+                $(environmentName)-latest
+
+  - stage: Deploy
+    displayName: 'Deploy Stage'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: Deploy
+        displayName: 'Deploy to $(environmentName)'
+        pool:
+          name: $(agentPoolName)
+        variables:
+          # Variable group holding: OPENAI_API_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID,
+          # VERIFY_TOKEN, ACR_USERNAME, ACR_PASSWORD (mark them secret)
+          - group: ABGChatbot-Dev-Secrets
+        steps:
+          - task: KubectlInstaller@0
+            inputs:
+              kubectlVersion: '1.37.0'
+            displayName: 'Install Kubectl'
+
+          - task: HelmInstaller@1
+            displayName: 'Install Helm'
+            inputs:
+              helmVersionToInstall: '4.3.0'
+
+          - task: DownloadSecureFile@1
+            name: kubeconfig
+            displayName: 'Download Kubeconfig'
+            inputs:
+              secureFile: '$(kubeConfigSecureFile)'
+
+          - script: |
+              VERSION="$(majorMinorVersion).$(Build.BuildId)"
+              export KUBECONFIG=$(kubeconfig.secureFilePath)
+
+              helm version --short
+              kubectl version --client
+
+              echo "Deploying ABG chatbot version: $VERSION to $(environmentName) in namespace $(k8sNamespace)"
+
+              kubectl create namespace $(k8sNamespace) --dry-run=client -o yaml | kubectl apply -f -
+
+              # Secrets arrive as environment variables (mapped below), not inline in the command
+              helm upgrade --install $(releaseName) $(chartPath) \
+                --namespace $(k8sNamespace) \
+                --atomic --wait --timeout 10m \
+                --set image.repository="$(containerRegistry)/$(imageRepository)" \
+                --set image.tag="$VERSION" \
+                --set imageCredentials.create=true \
+                --set-string imageCredentials.registry="$(containerRegistry)" \
+                --set-string imageCredentials.username="$ACR_USERNAME" \
+                --set-string imageCredentials.password="$ACR_PASSWORD" \
+                --set-string appSecrets.openaiApiKey="$OPENAI_API_KEY" \
+                --set-string appSecrets.whatsappToken="$WHATSAPP_TOKEN" \
+                --set-string appSecrets.phoneNumberId="$PHONE_NUMBER_ID" \
+                --set-string appSecrets.verifyToken="$VERIFY_TOKEN" \
+                -f $(chartPath)/$(valuesFile)
+            displayName: 'Execute Helm Upgrade'
+            env:
+              ACR_USERNAME: $(ACR_USERNAME)
+              ACR_PASSWORD: $(ACR_PASSWORD)
+              OPENAI_API_KEY: $(OPENAI_API_KEY)
+              WHATSAPP_TOKEN: $(WHATSAPP_TOKEN)
+              PHONE_NUMBER_ID: $(PHONE_NUMBER_ID)
+              VERIFY_TOKEN: $(VERIFY_TOKEN)
